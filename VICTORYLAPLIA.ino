@@ -1,5 +1,4 @@
-// VICTORY LAP CODE, in this code the robot will turn around the table and return to it's starting point.
-
+/* VICTORY LAP CODE, in this code the robot will turn around the table and return to it's starting point. */
 const int pinA = 5; // control the speed range 0 to 255 motor A  
 const int pinB = 6; // control the speed range 0 to 255 motor B  
 const int pinC = 7; // control the direction for motor A  
