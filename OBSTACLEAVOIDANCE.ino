@@ -1,3 +1,4 @@
+/* This code makes the robot move forward unless it reaches an object which causes it to move left OR left depending if there is an object infront*/
 
 #include <Servo.h> // Include Servo library for servo control  
 // Pin Definitions  
