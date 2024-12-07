@@ -1,3 +1,6 @@
+/* This is the line tracking code, with the sensors on the bottom of the car, 
+it will detect the black surface (the line) and follow it accordingly*/
+
 // Pin Definitions for Motor Control 
 int pinC = 7; // Left motor direction 
 int pinD = 8; // Right motor direction 
