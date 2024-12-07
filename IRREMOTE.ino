@@ -1,4 +1,4 @@
-//IR REMOTE CODE, the car will receive a signal on where to move depending on the button pressed on the remote.
+/*IR REMOTE CODE, the car will receive a signal on where to move depending on the button pressed on the remote. */
 
 
 const int pinA = 5; // control the speed range 0 to 255 motor A  
