@@ -1,93 +1,186 @@
 /*IR REMOTE CODE, the car will receive a signal on where to move depending on the button pressed on the remote. */
 
-
-const int pinA = 5; // control the speed range 0 to 255 motor A  
-const int pinB = 6; // control the speed range 0 to 255 motor B  
-const int pinC = 7; // control the direction for motor A  
-const int pinD = 8; // control the direction for motor B  
-const int pinE = 3; // standby to make the whole car stop  
-int carState = 1; // controls if car is on or off  
+ 
+#include <IRremote.h> 
  
  
-void setup() {  
-pinMode(pinA, OUTPUT);  
-pinMode(pinB, OUTPUT);  
-pinMode(pinC, OUTPUT);  
-pinMode(pinD, OUTPUT);  
-pinMode(pinE, OUTPUT);  
-}  
+const int IR_RECEIVE_PIN = 9; // Define the pin connected to the IR receiver 
  
  
-void loop() {  
-forward(); // Move forward 
-delay(3700); // Move forward for 3 seconds 
-turnRight(); // Turn right 
-delay(4000); // Turn right for 1 second 
-forward(); 
-delay(4000); 
+// Pin Definitions 
+const int pinA = 5; // Motor A speed (PWM) 
+const int pinB = 6; // Motor B speed (PWM) 
+const int pinC = 7; // Motor A direction 
+const int pinD = 8; // Motor B direction 
+const int pinE = 3; // Standby pin to stop the whole car 
  
  
-turnRight(); 
-delay(4000); 
+int carState = 0; // Tracks the current state: 0 = stopped, 1 = forward, -1 = backward 
+int carSpeed = 80; // Initial speed of the car (range: 0 to 255) 
+const int speedStep = 10; // Increment for speed adjustment 
  
  
- 
-forward(); 
-delay(4000); 
- 
- 
-turnLeft(); 
-delay(4500); 
- 
- 
-forward(); 
-delay(3700); 
- 
- 
-turnRight(); // Turn right 
-delay(4000); // Turn right for 1 second 
- 
- 
+void setup() { 
+Serial.begin(9600); 
+IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK); // Initialize the receiver 
+Serial.println("IR Receiver Initialized. Waiting for input..."); 
+pinMode(pinC, OUTPUT); 
+pinMode(pinD, OUTPUT); 
+pinMode(pinA, OUTPUT); 
+pinMode(pinB, OUTPUT); 
+pinMode(pinE, OUTPUT); 
 } 
  
  
-// Function to move the car forward 
-void forward() {  
-digitalWrite(pinC, LOW); // Motor A moves forward  
-analogWrite(pinA, 50); // Motor A speed  
-digitalWrite(pinD, LOW); // Motor B moves forward  
-analogWrite(pinB, 50); // Motor B speed  
-digitalWrite(pinE, carState); // Enable the car (standby pin)  
-}  
+void loop() { 
+// Check if a signal is received 
+if (IrReceiver.decode()) { 
+unsigned long receivedCode = IrReceiver.decodedIRData.decodedRawData; 
  
  
-// Function to move the car backward 
-void backward() {  
-digitalWrite(pinC, HIGH); // Motor A moves backward  
-analogWrite(pinA, 50); // Motor A speed  
-digitalWrite(pinD, HIGH); // Motor B moves backward  
-analogWrite(pinB, 50); // Motor B speed  
-digitalWrite(pinE, carState); // Enable the car (standby pin)  
-}  
+Serial.print("Received HEX Value: 0x"); 
+Serial.println(receivedCode, HEX); // Print the HEX value of the received signal 
  
  
-// Function to turn the car left 
+// Handle buttons 
+if (receivedCode == 0xB946FF00) { // Forward button 
+Serial.println("Forward button pressed."); 
+backward(); // Move backward instead of forward 
+carState = -1; 
+} else if (receivedCode == 0xEA15FF00) { // Backward button 
+Serial.println("Backward button pressed."); 
+forward(); // Move forward instead of backward 
+carState = 1; 
+} else if (receivedCode == 0xBF40FF00) { // Stop button 
+Serial.println("Stop button pressed."); 
+stopMotors(); 
+carState = 0; 
+} else if (receivedCode == 0xBC43FF00) { // Turn right button 
+Serial.println("Turn right button pressed."); 
+if (carState == 1) { 
+turnLeft(); // Turn left instead of right 
+} else if (carState == -1) { 
+turnLeftBackward(); // Turn left when moving backward 
+} 
+} else if (receivedCode == 0xBB44FF00) { // Turn left button 
+Serial.println("Turn left button pressed."); 
+if (carState == 1) { 
+turnRight(); // Turn right instead of left 
+} else if (carState == -1) { 
+turnRightBackward(); // Turn right when moving backward 
+} 
+} else if (receivedCode == 0xF609FF00) { // Speed up button 
+increaseSpeed(); 
+} else if (receivedCode == 0xF807FF00) { // Speed down button 
+decreaseSpeed(); 
+} 
+ 
+ 
+IrReceiver.resume(); // Prepare to receive the next signal 
+} 
+} 
+ 
+ 
+// Adjust speed up 
+void increaseSpeed() { 
+carSpeed += speedStep; 
+if (carSpeed > 255) carSpeed = 255; // Limit maximum speed 
+Serial.print("Speed increased to: "); 
+Serial.println(carSpeed); 
+applyCurrentState(); 
+} 
+ 
+ 
+// Adjust speed down 
+void decreaseSpeed() { 
+carSpeed -= speedStep; 
+if (carSpeed < 0) carSpeed = 0; // Limit minimum speed 
+Serial.print("Speed decreased to: "); 
+Serial.println(carSpeed); 
+applyCurrentState(); 
+} 
+ 
+ 
+// Reapply current state after speed change 
+void applyCurrentState() { 
+if (carState == 1) { 
+forward(); // Move forward if the state is forward 
+} else if (carState == -1) { 
+backward(); // Move backward if the state is backward 
+} 
+} 
+ 
+ 
+// Move backward (previously forward) 
+void backward() { 
+digitalWrite(pinC, LOW); // Motor A direction (backward) 
+analogWrite(pinA, carSpeed); // Motor A speed (set speed) 
+digitalWrite(pinD, LOW); // Motor B direction (backward) 
+analogWrite(pinB, carSpeed); // Motor B speed (set speed) 
+digitalWrite(pinE, HIGH); // Enable car 
+} 
+ 
+ 
+// Move forward (previously backward) 
+void forward() { 
+digitalWrite(pinC, HIGH); // Motor A direction (forward) 
+analogWrite(pinA, carSpeed); // Motor A speed (set speed) 
+digitalWrite(pinD, HIGH); // Motor B direction (forward) 
+analogWrite(pinB, carSpeed); // Motor B speed (set speed) 
+digitalWrite(pinE, HIGH); // Enable car 
+} 
+ 
+ 
+// Stop motors 
+void stopMotors() { 
+digitalWrite(pinC, LOW); // Motor A direction (stop) 
+analogWrite(pinA, 0); // Motor A speed (stop) 
+digitalWrite(pinD, LOW); // Motor B direction (stop) 
+analogWrite(pinB, 0); // Motor B speed (stop) 
+digitalWrite(pinE, LOW); // Disable car 
+} 
+ 
+ 
+// Turn the car left while moving forward (previously right) 
 void turnLeft() { 
-digitalWrite(pinC, LOW); // Motor A moves forward 
-analogWrite(pinA, 50); // Motor A speed 
-digitalWrite(pinD, LOW); // Motor B stops (doesn't move) 
-analogWrite(pinB, 0); // Motor B speed = 0 (stop) 
-digitalWrite(pinE, carState); // Enable the car 
+digitalWrite(pinC, HIGH); // Motor A direction (forward) 
+analogWrite(pinA, carSpeed / 2); // Motor A speed (reduced speed) 
+digitalWrite(pinD, HIGH); // Motor B direction (backward) 
+analogWrite(pinB, carSpeed); // Motor B speed (full speed) 
 } 
  
  
-// Function to turn the car right 
+// Turn the car right while moving forward (previously left) 
 void turnRight() { 
-digitalWrite(pinC, LOW); // Motor A stops (doesn't move) 
-analogWrite(pinA, 0); // Motor A speed = 0 (stop) 
-digitalWrite(pinD, HIGH); // Motor B moves forward 
-analogWrite(pinB, 50); // Motor B speed 
-digitalWrite(pinE, carState); // Enable the car 
+digitalWrite(pinC, HIGH); // Motor A direction (backward) 
+analogWrite(pinA, carSpeed); // Motor A speed (full speed) 
+digitalWrite(pinD, HIGH); // Motor B direction (forward) 
+analogWrite(pinB, carSpeed / 2); // Motor B speed (reduced speed) 
 } 
  
  
+// Turn the car left while moving backward (previously right) 
+void turnRightBackward() { 
+digitalWrite(pinC, LOW); // Motor A direction (backward) 
+analogWrite(pinA, carSpeed / 2); // Motor A speed (reduced speed) 
+digitalWrite(pinD, LOW); // Motor B direction (backward) 
+analogWrite(pinB, carSpeed); // Motor B speed (full speed) 
+} 
+ 
+ 
+// Turn the car right while moving backward (previously left) 
+void turnLeftBackward() { 
+digitalWrite(pinC, LOW); // Motor A direction (forward) 
+analogWrite(pinA, carSpeed); // Motor A speed (full speed) 
+digitalWrite(pinD, LOW); // Motor B direction (forward) 
+analogWrite(pinB, carSpeed / 2); // Motor B speed (reduced speed) 
+} 
+ 
+ 
+// U-turn (same, no change) 
+void UTurn() { 
+digitalWrite(pinC, HIGH); // Motor A direction (backward) 
+analogWrite(pinA, carSpeed); // Motor A speed (full speed) 
+digitalWrite(pinD, LOW); // Motor B direction (backward) 
+analogWrite(pinB, carSpeed); // Motor B speed (reduced speed) 
+} 
